@@ -125,17 +125,17 @@ export default function Home() {
 
   return (
     <div className="h-screen-safe bg-white flex flex-col overflow-hidden">
-      {/* Minimal header - fixed height with safe area */}
+      {/* Minimal header - compact */}
       <header className="flex-shrink-0 safe-top bg-white">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-center">
-          <span className="text-xl font-bold">iris</span>
+        <div className="max-w-3xl mx-auto px-4 py-2 flex items-center justify-center">
+          <span className="text-lg font-bold">iris</span>
         </div>
       </header>
 
       {/* Chat area - takes remaining space, scrollable */}
-      <main className="flex-1 min-h-0 flex flex-col max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 min-h-0 flex flex-col max-w-3xl w-full mx-auto px-4">
         {/* Messages - scrollable area */}
-        <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-4">
+        <div className="flex-1 min-h-0 overflow-y-auto py-2 space-y-3">
           {messages.map((message, index) => (
             <div
               key={message.id}
@@ -184,30 +184,30 @@ export default function Home() {
         </div>
 
         {/* Input area - fixed at bottom with safe area padding */}
-        <div className="flex-shrink-0 pb-4 safe-bottom">
+        <div className="flex-shrink-0 py-2 safe-bottom">
           {stage === 'ready' && searchProfile.isComplete ? (
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button onClick={startNewSearch} className="btn btn-primary flex-1 rounded-full py-3 sm:py-2">
+            <div className="flex gap-2">
+              <button onClick={startNewSearch} className="btn btn-primary flex-1 rounded-full py-2.5">
                 Start New Search
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex items-center gap-2 sm:gap-3 bg-white border border-gray-200 rounded-full pl-4 sm:pl-6 pr-2 sm:pr-3 py-1.5 sm:py-2 shadow-lg">
+            <form onSubmit={handleSubmit} className="flex items-center gap-2 bg-white border border-gray-200 rounded-full pl-4 pr-1.5 py-1 shadow-lg">
               <input
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Talk to iris"
-                className="flex-1 min-w-0 bg-transparent py-2 text-base focus:outline-none"
+                className="flex-1 min-w-0 bg-transparent py-1.5 text-base focus:outline-none"
                 disabled={isLoading}
                 autoFocus
               />
               <button
                 type="submit"
                 disabled={isLoading || !inputValue.trim()}
-                className="flex-shrink-0 w-10 h-10 rounded-full bg-black text-white flex items-center justify-center disabled:opacity-30 transition-opacity"
+                className="flex-shrink-0 w-9 h-9 rounded-full bg-black text-white flex items-center justify-center disabled:opacity-30 transition-opacity"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <path d="M12 19V5M5 12l7-7 7 7" />
                 </svg>
               </button>
