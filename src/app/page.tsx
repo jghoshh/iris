@@ -184,7 +184,7 @@ export default function Home() {
         </div>
 
         {/* Input area - fixed at bottom with safe area padding */}
-        <div className="flex-shrink-0 py-2 safe-bottom">
+        <div className="flex-shrink-0 pt-2 safe-bottom-padded">
           {stage === 'ready' && searchProfile.isComplete ? (
             <div className="flex gap-2">
               <button onClick={startNewSearch} className="btn btn-primary flex-1 rounded-full py-2.5">
