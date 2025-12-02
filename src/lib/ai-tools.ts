@@ -175,6 +175,23 @@ export const AI_TOOLS = [
         required: ['item']
       }
     }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'respond',
+      description: 'Send a text response without any UI components. Use this for greetings, answering questions, small talk, or any conversational response that does not require showing a UI component. Examples: "hey!", "what\'s your name?", "how does this work?", "yes", "no", "ok".',
+      parameters: {
+        type: 'object',
+        properties: {
+          message: {
+            type: 'string',
+            description: 'The text message to send to the user'
+          }
+        },
+        required: ['message']
+      }
+    }
   }
 ]
 

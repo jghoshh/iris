@@ -47,12 +47,13 @@ ${JSON.stringify({
 })}
 
 ## Available Tools (use via tool_calls)
-- ask_for_budget: When you know what item they want but need their budget. Shows a budget input field with an "I don't know" option.
+- respond: For regular conversation - greetings, questions, small talk. Use when no UI component is needed.
+- ask_for_budget: When you know what item they want but need their budget. Shows a budget input field.
 - ask_for_confirmation: When you have both item and budget, confirm before searching. Shows confirm/edit buttons.
 - search_marketplace: When confirmed and ready to search. Shows searching animation, then results.
 - show_deal_details: Display expanded info about a specific deal when user wants to know more.
 - start_negotiation: When user has picked a deal they want to pursue. Shows the deal card and opening message suggestions.
-- generate_message_suggestions: Generate next message options based on negotiation context (opening, counter_offer, closing, walking_away).
+- generate_message_suggestions: Generate next message options based on negotiation context.
 - show_negotiation_thread: Display the conversation thread with the seller.
 - compare_deals: Show side-by-side comparison when user is deciding between multiple options.
 
@@ -86,7 +87,7 @@ Other tool triggers:
 - search_marketplace: When user confirms search (start_search:true action)
 - start_negotiation: When user selects a deal (selected_deal_id action)
 
-DO NOT call tools when:
+Use respond tool when:
 - User is asking questions ("what's your name?", "how does this work?", "what can you do?")
 - User is making conversation or small talk that doesn't mention an item
 - User says something vague like "yes", "no", "ok" without mentioning an item
@@ -533,6 +534,18 @@ async function executeToolCall(
       break
     }
 
+    case 'respond': {
+      // Pure text response - no components needed
+      // The message is passed via the tool arguments and will be used as overrideMessage
+      const args = toolCall.arguments as { message: string }
+      return {
+        components: [],
+        profileUpdates: {},
+        nextStage: undefined,
+        overrideMessage: args.message
+      }
+    }
+
   }
 
   return { components, profileUpdates, nextStage }
@@ -599,22 +612,9 @@ async function callOpenRouter(
     forcedToolChoice = { type: 'function', function: { name: 'generate_message_suggestions' } }
     console.log(`[OpenRouter] Forcing generate_message_suggestions after seller response`)
   } else {
-    // Safety net: Force ask_for_budget when user mentions a demo product and we need budget
-    // This is necessary because some models (like grok) don't reliably call tools from prompts alone
-    const userText = lastMessage?.content?.toLowerCase() || ''
-    const demoProducts = ['iphone', 'macbook', 'ps5', 'airpods', 'monitor', 'desk', 'chair', 'bike', 'couch',
-                          'phone', 'laptop', 'playstation', 'earbuds', 'headphones', 'sofa', 'bicycle']
-    const mentionsDemoProduct = demoProducts.some(p => userText.includes(p))
-    const needsBudget = !currentProfile.budgetMax || currentProfile.budgetMax === null
-    const notInNegotiation = !currentProfile.selectedDealId
-
-    if (mentionsDemoProduct && needsBudget && notInNegotiation) {
-      forcedToolChoice = { type: 'function', function: { name: 'ask_for_budget' } }
-      console.log(`[OpenRouter] Forcing ask_for_budget - user mentioned "${userText}" and no budget set`)
-    }
+    // Force the model to call a tool - it must choose which one based on context
+    forcedToolChoice = 'required'
   }
-
-  // Let the AI decide in other cases based on the system prompt
 
   const requestBody: Record<string, unknown> = {
     model: OPENROUTER_MODEL,
