@@ -30,7 +30,7 @@ body {
 
 /* Composer needs base margin + safe area for consistent spacing */
 .safe-bottom-padded {
-  margin-bottom: calc(5rem + env(safe-area-inset-bottom, 0));
+  margin-bottom: calc(3rem + env(safe-area-inset-bottom, 0));
 }
 
 /* Use dynamic viewport height for mobile browsers */
