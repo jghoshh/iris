@@ -118,6 +118,24 @@ You: "nice pick! let's get you a deal" + call start_negotiation(deal_id="deal-12
 User: [action: start_search=false]
 You: "no problem! what do you want to change?" (no tool call needed - let them type)
 
+## DEMO MODE - Available Products
+This is a demo with limited product categories. You can ONLY search for these items:
+- iphone (also matches: phone, smartphone, apple phone, mobile)
+- macbook (also matches: laptop, mac, apple laptop, notebook, computer)
+- ps5 (also matches: playstation, gaming console, game console, sony)
+- airpods (also matches: earbuds, headphones, wireless earbuds)
+- monitor (also matches: display, screen, computer screen)
+- desk (also matches: standing desk, work desk, office desk)
+- chair (also matches: office chair, gaming chair, desk chair)
+- bike (also matches: bicycle, road bike, mountain bike)
+- couch (also matches: sofa, sectional, loveseat)
+
+IMPORTANT: If user asks for something NOT in this list:
+1. Check if it's similar to any available category (e.g., "laptop" → macbook, "headphones" → airpods)
+2. If similar, suggest the matching category: "i don't have laptops but i can search for macbooks - want me to look?"
+3. If NOT similar to anything, politely explain: "this demo only has: iphones, macbooks, ps5, airpods, monitors, desks, chairs, bikes, and couches. which would you like?"
+4. Do NOT proceed to ask_for_budget for unavailable items
+
 ## Edge Cases to Handle
 1. User provides item AND budget in one message (e.g., "iphone under 400"):
    - Extract both pieces of info
@@ -200,7 +218,7 @@ async function executeToolCall(
   searchProfile: SearchProfile,
   _globalPreferences: GlobalPreferences,
   userAction?: Record<string, unknown>
-): Promise<{ components: InteractiveComponent[]; profileUpdates: Partial<SearchProfile>; nextStage?: ConversationStage }> {
+): Promise<{ components: InteractiveComponent[]; profileUpdates: Partial<SearchProfile>; nextStage?: ConversationStage; overrideMessage?: string }> {
   const components: InteractiveComponent[] = []
   const profileUpdates: Partial<SearchProfile> = {}
   let nextStage: ConversationStage | undefined
@@ -241,6 +259,40 @@ async function executeToolCall(
 
     case 'ask_for_budget': {
       const args = toolCall.arguments as { item: string }
+      const itemLower = args.item.toLowerCase()
+
+      // Demo product validation with synonyms
+      const demoCategories: Record<string, string[]> = {
+        iphone: ['iphone', 'phone', 'smartphone', 'apple phone', 'mobile'],
+        macbook: ['macbook', 'laptop', 'mac', 'apple laptop', 'notebook', 'computer'],
+        ps5: ['ps5', 'playstation', 'gaming console', 'game console', 'sony'],
+        airpods: ['airpods', 'earbuds', 'headphones', 'wireless earbuds', 'earphones'],
+        monitor: ['monitor', 'display', 'screen'],
+        desk: ['desk', 'standing desk', 'work desk', 'office desk'],
+        chair: ['chair', 'office chair', 'gaming chair', 'desk chair'],
+        bike: ['bike', 'bicycle', 'road bike', 'mountain bike', 'cycling'],
+        couch: ['couch', 'sofa', 'sectional', 'loveseat'],
+      }
+
+      // Check if the item matches any demo category
+      let matchedCategory: string | null = null
+      for (const [category, synonyms] of Object.entries(demoCategories)) {
+        if (synonyms.some(syn => itemLower.includes(syn))) {
+          matchedCategory = category
+          break
+        }
+      }
+
+      if (!matchedCategory) {
+        // Item not in demo - return a message instead of the budget component
+        return {
+          components: [],
+          profileUpdates: {},
+          nextStage: 'gathering_item' as ConversationStage,
+          overrideMessage: "this demo only has: iphones, macbooks, ps5, airpods, monitors, desks, chairs, bikes, and couches. which would you like to try?"
+        }
+      }
+
       components.push({
         type: 'budget_input',
         id: 'budget',
@@ -607,6 +659,8 @@ async function callOpenRouter(
   let profileUpdates: Partial<SearchProfile> = {}
   let stage: ConversationStage = currentProfile.foundDeals?.length ? 'showing_deals' : 'gathering_item'
 
+  let overrideMessage: string | undefined
+
   if (choice.message.tool_calls) {
     console.log(`[OpenRouter] Processing ${choice.message.tool_calls.length} tool calls`)
     for (const tc of choice.message.tool_calls) {
@@ -621,6 +675,7 @@ async function callOpenRouter(
         components = [...components, ...result.components]
         profileUpdates = { ...profileUpdates, ...result.profileUpdates }
         if (result.nextStage) stage = result.nextStage
+        if (result.overrideMessage) overrideMessage = result.overrideMessage
       }
     }
   }
@@ -665,6 +720,11 @@ async function callOpenRouter(
   // Preserve reasoning_details for multi-turn conversations with reasoning models
   const reasoning_details = choice.message.reasoning_details
 
+  // If a tool call returned an override message (e.g., invalid demo product), use it instead
+  if (overrideMessage) {
+    message = overrideMessage
+  }
+
   return {
     message,
     components,
@@ -695,7 +755,7 @@ function simulateResponse(
   // Initial greeting
   if (messageCount === 0) {
     return {
-      message: "hey! i'm iris. i help people find stuff on marketplace and negotiate the best price. what are you looking for?",
+      message: "hey! i'm iris - i help you find deals and negotiate prices on marketplace. try asking for an iphone, macbook, ps5, airpods, or something else!",
       components: [],
       profile_updates: {},
       stage: 'greeting'
@@ -878,18 +938,56 @@ function simulateResponse(
     }
   }
 
-  // Simple item extraction - look for known categories
-  const categories = ['iphone', 'macbook', 'ps5', 'playstation', 'bike', 'couch', 'sofa', 'airpods', 'monitor', 'desk', 'chair']
-  for (const cat of categories) {
-    if (userText.includes(cat)) {
-      updates.itemDescription = userText.split(/[,.]|\bfor\b|\bunder\b|\baround\b/)[0].trim()
-      break
-    }
+  // Demo product categories with synonyms
+  const categoryMap: Record<string, string[]> = {
+    iphone: ['iphone', 'phone', 'smartphone', 'apple phone', 'mobile'],
+    macbook: ['macbook', 'laptop', 'mac ', 'apple laptop', 'notebook', 'computer'],
+    ps5: ['ps5', 'playstation', 'gaming console', 'game console', 'sony'],
+    airpods: ['airpods', 'earbuds', 'headphones', 'wireless earbuds', 'earphones'],
+    monitor: ['monitor', 'display', 'screen'],
+    desk: ['desk', 'standing desk', 'work desk', 'office desk'],
+    chair: ['chair', 'office chair', 'gaming chair', 'desk chair'],
+    bike: ['bike', 'bicycle', 'road bike', 'mountain bike', 'cycling'],
+    couch: ['couch', 'sofa', 'sectional', 'loveseat'],
   }
 
-  // If no category found but has some text, use the whole thing
-  if (!updates.itemDescription && userText.length > 2 && !userText.match(/^(hi|hey|hello|yes|no)$/)) {
+  // Try to match user input to a demo category
+  let matchedCategory: string | null = null
+  let matchedSynonym: string | null = null
+
+  for (const [category, synonyms] of Object.entries(categoryMap)) {
+    for (const syn of synonyms) {
+      if (userText.includes(syn)) {
+        matchedCategory = category
+        matchedSynonym = syn
+        break
+      }
+    }
+    if (matchedCategory) break
+  }
+
+  if (matchedCategory) {
+    // If matched via synonym (not exact category name), suggest the real category
+    const exactCategories = Object.keys(categoryMap)
+    if (matchedSynonym && !exactCategories.includes(matchedSynonym)) {
+      return {
+        message: `i don't have ${matchedSynonym}s but i can search for ${matchedCategory}s - want me to look?`,
+        components: [],
+        profile_updates: { itemDescription: matchedCategory },
+        stage: 'gathering_item'
+      }
+    }
     updates.itemDescription = userText.split(/[,.]|\bfor\b|\bunder\b|\baround\b/)[0].trim()
+  }
+
+  // If user typed something but it's not in our demo categories, tell them
+  if (!updates.itemDescription && userText.length > 2 && !userText.match(/^(hi|hey|hello|yes|no|ok|okay|sure|thanks|thank you|yeah|yep|yup|nope)$/i)) {
+    return {
+      message: "this demo has: iphones, macbooks, ps5, airpods, monitors, desks, chairs, bikes, and couches. which interests you?",
+      components: [],
+      profile_updates: {},
+      stage: 'gathering_item'
+    }
   }
 
   const newProfile = { ...currentProfile, ...updates }
@@ -1015,10 +1113,10 @@ export async function executeSearch(
 
   if (deals.length === 0) {
     return {
-      message: "hmm couldn't find anything matching that. want to try different criteria?",
+      message: "hmm couldn't find anything for that. for this demo, try searching for things like iphone, macbook, ps5, airpods, monitor, desk, chair, bike, or couch!",
       components: [],
-      profile_updates: {},
-      stage: 'gathering_preferences'
+      profile_updates: { itemDescription: undefined, budgetMax: undefined, isComplete: false },
+      stage: 'gathering_item'
     }
   }
 

@@ -29,7 +29,7 @@ export default function Home() {
     const assistantMessage: ConversationMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',
-      content: "hey! i'm iris. i help people find stuff on marketplace and negotiate the best price. what are you looking for?",
+      content: "hey! i'm iris - i help you find deals and negotiate prices on marketplace. try asking for an iphone, macbook, ps5, airpods, or something else!",
       components: undefined,
       timestamp: new Date(),
     }
