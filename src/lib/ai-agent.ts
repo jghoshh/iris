@@ -115,9 +115,6 @@ You: "on it!" + call search_marketplace(query="iphone", budget_max=300)
 User: [action: selected_deal_id="deal-123"]
 You: "nice pick! let's get you a deal" + call start_negotiation(deal_id="deal-123")
 
-User: [action: start_search=false]
-You: "no problem! what do you want to change?" (no tool call needed - let them type)
-
 ## DEMO MODE - Available Products
 This is a demo with limited product categories. You can ONLY search for these items:
 - iphone (also matches: phone, smartphone, apple phone, mobile)
@@ -141,19 +138,15 @@ IMPORTANT: If user asks for something NOT in this list:
    - Extract both pieces of info
    - Call ask_for_confirmation immediately (skip ask_for_budget)
 
-2. User changes mind after confirming:
-   - If they say "wait" or "change" or "edit", just ask what they want to change
-   - Don't call any tools, let them type freely
-
-3. User asks about a deal without selecting:
+2. User asks about a deal without selecting:
    - If they ask questions like "tell me more about the first one", call show_deal_details
    - Don't start negotiation until they explicitly select
 
-4. User wants to see different results:
+3. User wants to see different results:
    - If they say "show me more" or "different options", acknowledge and ask what to change
    - They may want different price range, different item, etc.
 
-5. User provides budget range (e.g., "$200-400"):
+4. User provides budget range (e.g., "$200-400"):
    - Use the higher number as budget_max
    - Use the lower number as budget_min
 
@@ -259,7 +252,9 @@ async function executeToolCall(
 
     case 'ask_for_budget': {
       const args = toolCall.arguments as { item: string }
-      const itemLower = args.item.toLowerCase()
+      // Use searchProfile.itemDescription as fallback if AI doesn't provide item
+      const item = args.item || searchProfile.itemDescription || ''
+      const itemLower = item.toLowerCase()
 
       // Demo product validation with synonyms
       const demoCategories: Record<string, string[]> = {
@@ -296,9 +291,9 @@ async function executeToolCall(
       components.push({
         type: 'budget_input',
         id: 'budget',
-        item: args.item
+        item: item
       })
-      profileUpdates.itemDescription = args.item
+      profileUpdates.itemDescription = item
       nextStage = 'gathering_budget'
       break
     }
@@ -521,6 +516,7 @@ async function executeToolCall(
       }
       break
     }
+
   }
 
   return { components, profileUpdates, nextStage }
@@ -572,17 +568,14 @@ async function callOpenRouter(
   const lastMessage = messages[messages.length - 1]
   const componentValues = lastMessage?.componentValues || {}
 
-  // Force specific tools based on user action (component-based)
+  // Force specific tools based on user action
+  // Note: Most button-click actions (start_search, edit_choice, budget_amount) are
+  // handled by handleDeterministicAction before this function is called.
+  // Only negotiation actions reach here since they need AI-generated suggestions.
   let forcedToolChoice: string | { type: string; function: { name: string } } = 'auto'
   if (componentValues.selected_deal_id) {
     forcedToolChoice = { type: 'function', function: { name: 'start_negotiation' } }
     console.log(`[OpenRouter] Forcing start_negotiation for deal: ${componentValues.selected_deal_id}`)
-  } else if (componentValues.start_search === true) {
-    forcedToolChoice = { type: 'function', function: { name: 'search_marketplace' } }
-    console.log(`[OpenRouter] Forcing search_marketplace`)
-  } else if (componentValues.budget_amount || componentValues.budget_unknown) {
-    forcedToolChoice = { type: 'function', function: { name: 'ask_for_confirmation' } }
-    console.log(`[OpenRouter] Forcing ask_for_confirmation after budget input`)
   } else if (componentValues.sent_message) {
     forcedToolChoice = { type: 'function', function: { name: 'show_negotiation_thread' } }
     console.log(`[OpenRouter] Forcing show_negotiation_thread after sent message`)
@@ -613,9 +606,9 @@ async function callOpenRouter(
   const requestBody: Record<string, unknown> = {
     model: OPENROUTER_MODEL,
     messages: chatMessages,
+    stream: false,
     tools: AI_TOOLS,
     tool_choice: forcedToolChoice,
-    stream: false,
   }
 
   // Reasoning models need different params
@@ -693,12 +686,21 @@ async function callOpenRouter(
       toolArgs = JSON.parse(choice.message.tool_calls[0].function.arguments || '{}')
     } catch { /* ignore parse errors */ }
 
+    // Merge current profile with updates from tool calls to get the latest state
+    const mergedProfile = { ...currentProfile, ...profileUpdates }
+
+    // Also check componentValues for budget that was just submitted
+    const budgetFromAction = componentValues.budget_amount as number | undefined
+
     // Dynamic fallback for ask_for_confirmation based on what we know
     let confirmationFallback = "ready to search?"
-    if (currentProfile.itemDescription && currentProfile.budgetMax) {
-      confirmationFallback = `${currentProfile.itemDescription} under $${currentProfile.budgetMax}. ready to search?`
-    } else if (currentProfile.itemDescription) {
-      confirmationFallback = `${currentProfile.itemDescription}. ready to search?`
+    const item = mergedProfile.itemDescription || currentProfile.itemDescription
+    const budget = budgetFromAction || mergedProfile.budgetMax || currentProfile.budgetMax
+
+    if (item && budget) {
+      confirmationFallback = `${item} under $${budget}. ready to search?`
+    } else if (item) {
+      confirmationFallback = `${item}. ready to search?`
     } else if (toolArgs.summary) {
       confirmationFallback = `${toolArgs.summary}. ready?`
     }
@@ -901,30 +903,9 @@ function simulateResponse(
     }
   }
 
-  // Handle confirmation
-  if (componentValues.start_search === true) {
-    return {
-      message: `searching for ${currentProfile.itemDescription?.toLowerCase()}...`,
-      components: [
-        {
-          type: 'searching',
-          id: 'search_animation',
-          query: currentProfile.itemDescription || ''
-        }
-      ],
-      profile_updates: { isComplete: true },
-      stage: 'searching'
-    }
-  }
-
-  if (componentValues.start_search === false) {
-    return {
-      message: "no problem, what do you want to change?",
-      components: [],
-      profile_updates: {},
-      stage: 'gathering_preferences'
-    }
-  }
+  // Note: All button-click actions (start_search, edit_choice, budget_amount, etc.)
+  // are handled by handleDeterministicAction before this function is called.
+  // This function only handles free-text input.
 
   // Parse user input for item/budget
   const updates: Partial<SearchProfile> = {}
@@ -1030,7 +1011,11 @@ function simulateResponse(
   if (!newProfile.budgetMax) {
     return {
       message: `nice, ${newProfile.itemDescription}. what's your budget?`,
-      components: [],
+      components: [{
+        type: 'budget_input',
+        id: 'budget',
+        item: newProfile.itemDescription || ''
+      }],
       profile_updates: updates,
       stage: 'gathering_budget'
     }
@@ -1052,6 +1037,96 @@ function simulateResponse(
 }
 
 /**
+ * Handle deterministic actions that don't need AI
+ * Returns null if the action requires AI processing
+ */
+function handleDeterministicAction(
+  componentValues: Record<string, unknown>,
+  currentProfile: SearchProfile
+): {
+  message: string
+  components: InteractiveComponent[]
+  profile_updates: Partial<SearchProfile>
+  stage: ConversationStage
+} | null {
+  // Edit flow: user clicked "Edit" button
+  if (componentValues.start_search === false) {
+    return {
+      message: "no problem, what do you want to change?",
+      components: [{
+        type: 'edit_choice',
+        id: 'edit_choice',
+        item: currentProfile.itemDescription ?? undefined,
+        budget: currentProfile.budgetMax ?? undefined
+      }],
+      profile_updates: {},
+      stage: 'gathering_preferences'
+    }
+  }
+
+  // Edit flow: user chose to change item
+  if (componentValues.edit_choice === 'item') {
+    return {
+      message: "what would you like to search for instead?",
+      components: [],
+      // Use null (not undefined) to clear - undefined gets stripped by JSON serialization
+      profile_updates: { itemDescription: null, budgetMax: null },
+      stage: 'gathering_item'
+    }
+  }
+
+  // Edit flow: user chose to change budget
+  if (componentValues.edit_choice === 'budget') {
+    return {
+      message: "what's your new budget?",
+      components: [{
+        type: 'budget_input',
+        id: 'budget',
+        item: currentProfile.itemDescription || ''
+      }],
+      // Use null (not undefined) to clear - undefined gets stripped by JSON serialization
+      profile_updates: { budgetMax: null },
+      stage: 'gathering_budget'
+    }
+  }
+
+  // Budget submitted: go to confirmation
+  if (componentValues.budget_amount || componentValues.budget_unknown) {
+    const budget = componentValues.budget_unknown ? 9999 : componentValues.budget_amount as number
+    const item = currentProfile.itemDescription || ''
+    const budgetDisplay = componentValues.budget_unknown ? 'any price' : `$${budget}`
+
+    return {
+      message: `${item} under ${budgetDisplay}. ready to search?`,
+      components: [{
+        type: 'confirm',
+        id: 'start_search',
+        confirmLabel: "Let's go",
+        cancelLabel: 'Edit'
+      }],
+      profile_updates: { budgetMax: budget },
+      stage: 'confirming'
+    }
+  }
+
+  // Confirm search: show searching animation
+  if (componentValues.start_search === true) {
+    return {
+      message: `searching for ${currentProfile.itemDescription?.toLowerCase() || 'items'}...`,
+      components: [{
+        type: 'searching',
+        id: 'search_animation',
+        query: currentProfile.itemDescription || ''
+      }],
+      profile_updates: { isComplete: true },
+      stage: 'searching'
+    }
+  }
+
+  return null // Needs AI processing
+}
+
+/**
  * Main entry point for getting AI response
  */
 export async function getAIResponse(
@@ -1065,6 +1140,15 @@ export async function getAIResponse(
   stage: ConversationStage
   reasoning_details?: unknown[]
 }> {
+  // Check for deterministic actions first - no AI needed
+  const lastMessage = messages[messages.length - 1]
+  const componentValues = lastMessage?.componentValues || {}
+
+  const deterministicResult = handleDeterministicAction(componentValues, currentProfile)
+  if (deterministicResult) {
+    return deterministicResult
+  }
+
   if (SIMULATE_CALLS) {
     // Add artificial delay for realism
     await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 200))
@@ -1101,8 +1185,8 @@ export async function executeSearch(
 }> {
   const listings = await marketplaceDatastore.search({
     query: searchProfile.itemDescription || '',
-    budgetMax: searchProfile.budgetMax,
-    budgetMin: searchProfile.budgetMin,
+    budgetMax: searchProfile.budgetMax ?? undefined,
+    budgetMin: searchProfile.budgetMin ?? undefined,
     maxDistanceKm: searchProfile.maxDistance || globalPreferences.maxDistanceKm,
     mustHaves: searchProfile.mustHaves,
     dealBreakers: searchProfile.dealBreakers,

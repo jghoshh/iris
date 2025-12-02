@@ -57,7 +57,13 @@ export default function Home() {
     )
 
     if (result.success && result.data) {
-      const updatedProfile = { ...searchProfile, ...result.data.profile_updates } as SearchProfile
+      // Merge profile updates, handling explicit undefined values to clear fields
+      const updatedProfile = { ...searchProfile } as SearchProfile
+      if (result.data.profile_updates) {
+        for (const [key, value] of Object.entries(result.data.profile_updates)) {
+          (updatedProfile as unknown as Record<string, unknown>)[key] = value
+        }
+      }
       setSearchProfile(updatedProfile)
       setStage(result.data.stage)
 

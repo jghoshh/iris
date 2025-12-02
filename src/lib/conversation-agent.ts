@@ -14,6 +14,7 @@ export type InteractiveComponent =
   | { type: 'checkbox_group'; id: string; label: string; options: { value: string; label: string }[] }
   | { type: 'confirm'; id: string; confirmLabel?: string; cancelLabel?: string }
   | { type: 'budget_input'; id: string; item: string }
+  | { type: 'edit_choice'; id: string; item?: string; budget?: number } // For choosing what to edit
   // Rich deal components
   | { type: 'deal_carousel'; id: string; deals: DealCardData[] }
   | { type: 'deal_card'; id: string; deal: DealCardData }
@@ -36,9 +37,9 @@ export interface ConversationMessage {
 }
 
 export interface SearchProfile {
-  itemDescription?: string
-  budgetMin?: number
-  budgetMax?: number
+  itemDescription?: string | null  // null used to explicitly clear via JSON
+  budgetMin?: number | null
+  budgetMax?: number | null
   maxDistance?: number
   urgency?: 'no_rush' | 'this_week' | 'asap'
   mustHaves?: string[]
@@ -724,8 +725,8 @@ export async function searchForDeals(
 ): Promise<DealCardData[]> {
   const listings = await marketplaceDatastore.search({
     query: searchProfile.itemDescription || '',
-    budgetMin: searchProfile.budgetMin,
-    budgetMax: searchProfile.budgetMax,
+    budgetMin: searchProfile.budgetMin ?? undefined,
+    budgetMax: searchProfile.budgetMax ?? undefined,
     maxDistanceKm: searchProfile.maxDistance || globalPreferences.maxDistanceKm,
     mustHaves: searchProfile.mustHaves,
     dealBreakers: searchProfile.dealBreakers,

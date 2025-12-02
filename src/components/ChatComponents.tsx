@@ -31,7 +31,7 @@ export function ChatComponents({ components, onSubmit, disabled }: ChatComponent
 
   const hasConfirm = components.some(c => c.type === 'confirm')
   const hasRichComponents = components.some(c =>
-    ['deal_carousel', 'deal_card', 'deal_comparison', 'negotiation_suggestions', 'negotiation_thread', 'negotiation_interface', 'searching', 'budget_input'].includes(c.type)
+    ['deal_carousel', 'deal_card', 'deal_comparison', 'negotiation_suggestions', 'negotiation_thread', 'negotiation_interface', 'searching', 'budget_input', 'edit_choice'].includes(c.type)
   )
 
   return (
@@ -235,6 +235,29 @@ export function ChatComponents({ components, onSubmit, disabled }: ChatComponent
                 disabled={disabled}
               >
                 I don't know my budget
+              </button>
+            </div>
+          )}
+
+          {component.type === 'edit_choice' && (
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => onSubmit({ edit_choice: 'item' })}
+                className="w-full px-5 py-3 sm:py-2.5 border border-gray-300 rounded-full text-sm font-medium hover:bg-gray-50 transition-all active:scale-[0.98] disabled:opacity-50 text-left flex justify-between items-center"
+                disabled={disabled}
+              >
+                <span>Change item</span>
+                <span className="text-gray-400 text-xs truncate ml-2 max-w-[150px]">{component.item || 'not set'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onSubmit({ edit_choice: 'budget' })}
+                className="w-full px-5 py-3 sm:py-2.5 border border-gray-300 rounded-full text-sm font-medium hover:bg-gray-50 transition-all active:scale-[0.98] disabled:opacity-50 text-left flex justify-between items-center"
+                disabled={disabled}
+              >
+                <span>Change budget</span>
+                <span className="text-gray-400 text-xs">{component.budget ? `$${component.budget}` : 'not set'}</span>
               </button>
             </div>
           )}
