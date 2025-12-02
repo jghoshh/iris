@@ -21,11 +21,11 @@ export async function GET() {
       orderBy: { updatedAt: 'desc' },
     })
 
-    const summaries: SessionSummary[] = sessions.map((session) => {
+    const summaries: SessionSummary[] = sessions.map((session: { id: string; name: string; status: string; createdAt: Date; deals: Array<{ id: string; state: string; dealScore: number }> }) => {
       const activeDeals = session.deals.filter(
-        (d) => !['done', 'dead'].includes(d.state)
+        (d: { state: string }) => !['done', 'dead'].includes(d.state)
       )
-      const scores = session.deals.map((d) => d.dealScore).filter((s) => s > 0)
+      const scores = session.deals.map((d: { dealScore: number }) => d.dealScore).filter((s: number) => s > 0)
       const highestScore = scores.length > 0 ? Math.max(...scores) : null
 
       let statusSummary = 'No deals yet'
