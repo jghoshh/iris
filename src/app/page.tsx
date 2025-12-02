@@ -124,18 +124,18 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Minimal header */}
-      <header className="relative">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-center">
+    <div className="h-screen-safe bg-white flex flex-col overflow-hidden">
+      {/* Minimal header - fixed height with safe area */}
+      <header className="flex-shrink-0 safe-top bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-center">
           <span className="text-xl font-bold">iris</span>
         </div>
       </header>
 
-      {/* Chat area - takes remaining space */}
-      <main className="flex-1 flex flex-col max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto py-6 space-y-4">
+      {/* Chat area - takes remaining space, scrollable */}
+      <main className="flex-1 min-h-0 flex flex-col max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Messages - scrollable area */}
+        <div className="flex-1 min-h-0 overflow-y-auto py-4 space-y-4">
           {messages.map((message, index) => (
             <div
               key={message.id}
@@ -183,8 +183,8 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input area - fixed at bottom */}
-        <div className="pb-8 sm:pb-12">
+        {/* Input area - fixed at bottom with safe area padding */}
+        <div className="flex-shrink-0 pb-4 safe-bottom">
           {stage === 'ready' && searchProfile.isComplete ? (
             <div className="flex flex-col sm:flex-row gap-2">
               <button onClick={startNewSearch} className="btn btn-primary flex-1 rounded-full py-3 sm:py-2">
