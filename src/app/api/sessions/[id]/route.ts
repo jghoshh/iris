@@ -37,7 +37,7 @@ export async function GET(
         ...session,
         hardConstraints: JSON.parse(session.hardConstraints),
         softPreferences: JSON.parse(session.softPreferences),
-        deals: session.deals.map((deal) => ({
+        deals: session.deals.map((deal: { listingAttributes: string; chatTurns: Array<{ createdAt: Date }> }) => ({
           ...deal,
           listingAttributes: JSON.parse(deal.listingAttributes),
           lastMessageAt: deal.chatTurns[0]?.createdAt || null,
