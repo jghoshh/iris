@@ -67,13 +67,19 @@ ${JSON.stringify({
 8. NEGOTIATING: Help them craft messages to the seller
 
 ## Tool Usage Guidelines
-Use tools to show UI components. You MUST call the appropriate tool when the situation matches - don't just describe the action, actually call the tool.
+Use tools to show UI components when the user is actively trying to find a deal.
 
-CRITICAL - Call these tools when:
-- ask_for_budget: User mentions an item they want. MUST call this tool.
-- ask_for_confirmation: User provides budget (or says they don't know). MUST call this tool.
-- search_marketplace: User confirms search (start_search:true). MUST call this tool.
-- start_negotiation: User selects a deal (selected_deal_id in action). IMMEDIATELY call this tool - don't ask if they want to negotiate, just start!
+IMPORTANT - When to call tools:
+- ask_for_budget: ONLY when user clearly states an item they want to search for (e.g., "looking for an iphone", "i need a macbook")
+- ask_for_confirmation: When user provides budget amount or says they don't know their budget
+- search_marketplace: When user confirms search (start_search:true action)
+- start_negotiation: When user selects a deal (selected_deal_id action)
+
+DO NOT call tools when:
+- User is asking questions ("what's your name?", "how does this work?", "what can you do?")
+- User is making conversation or small talk
+- User hasn't clearly indicated they want to search for something
+- You're unsure what item they want - just ask them to clarify instead
 
 ## Response Style
 - Always lowercase (except proper nouns)
@@ -584,24 +590,8 @@ async function callOpenRouter(
     console.log(`[OpenRouter] Forcing generate_message_suggestions after seller response`)
   }
 
-  // Additional heuristic: detect free-text scenarios that should force tool calls
-  // This helps ensure tools are called even when the AI might not naturally call them
-  if (forcedToolChoice === 'auto' && lastMessage?.role === 'user' && !Object.keys(componentValues).length) {
-    const userText = lastMessage.content.toLowerCase()
-    const hasBudget = /\$\s*\d+|\d+\s*(dollars?|bucks?)|\bunder\s+\d+|\bmax\s+\d+|\bbudget\s+\d+/i.test(userText)
-    const hasItem = userText.length > 3 && !userText.match(/^(hi|hey|hello|yes|no|ok|okay|sure|thanks|thank you)$/i)
-
-    // If user provides item AND budget in free text, and we don't have an item yet, force ask_for_confirmation
-    if (hasItem && hasBudget && !currentProfile.itemDescription) {
-      forcedToolChoice = { type: 'function', function: { name: 'ask_for_confirmation' } }
-      console.log(`[OpenRouter] Detected item+budget in free text, forcing ask_for_confirmation`)
-    }
-    // If user provides just an item (no budget), and we don't have an item yet, force ask_for_budget
-    else if (hasItem && !hasBudget && !currentProfile.itemDescription) {
-      forcedToolChoice = { type: 'function', function: { name: 'ask_for_budget' } }
-      console.log(`[OpenRouter] Detected item in free text, forcing ask_for_budget`)
-    }
-  }
+  // Let the AI decide when to call tools based on the system prompt
+  // We only force tools for specific button-click actions (handled above)
 
   const requestBody: Record<string, unknown> = {
     model: OPENROUTER_MODEL,

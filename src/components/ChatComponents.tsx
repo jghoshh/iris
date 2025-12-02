@@ -15,10 +15,11 @@ import {
 interface ChatComponentsProps {
   components: InteractiveComponent[]
   onSubmit: (values: Record<string, unknown>) => void
+  onStartNewSearch?: () => void
   disabled?: boolean
 }
 
-export function ChatComponents({ components, onSubmit, disabled }: ChatComponentsProps) {
+export function ChatComponents({ components, onSubmit, onStartNewSearch, disabled }: ChatComponentsProps) {
   const [values, setValues] = useState<Record<string, unknown>>({})
 
   const updateValue = (id: string, value: unknown) => {
@@ -313,6 +314,7 @@ export function ChatComponents({ components, onSubmit, disabled }: ChatComponent
               waitingForSeller={component.waitingForSeller}
               onSendMessage={(message) => onSubmit({ sent_message: message })}
               onAddSellerResponse={(response) => onSubmit({ seller_response: response })}
+              onStartNewSearch={onStartNewSearch}
               disabled={disabled}
             />
           )}

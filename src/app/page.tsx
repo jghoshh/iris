@@ -164,6 +164,7 @@ export default function Home() {
                     <ChatComponents
                       components={message.components}
                       onSubmit={handleComponentSubmit}
+                      onStartNewSearch={startNewSearch}
                       disabled={isLoading}
                     />
                   )}

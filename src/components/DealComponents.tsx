@@ -765,6 +765,7 @@ export function NegotiationInterface({
   waitingForSeller: _initialWaiting,
   onSendMessage: _onSendMessage,
   onAddSellerResponse: _onAddSellerResponse,
+  onStartNewSearch,
   disabled,
 }: {
   deal: DealCardData
@@ -773,6 +774,7 @@ export function NegotiationInterface({
   waitingForSeller?: boolean
   onSendMessage: (message: string) => void
   onAddSellerResponse?: (response: string) => void  // Optional - not used since component is self-contained
+  onStartNewSearch?: () => void  // Callback to end conversation and start fresh
   disabled?: boolean
 }) {
   // Internal state - this component manages the conversation locally
@@ -1036,6 +1038,18 @@ export function NegotiationInterface({
           </div>
         )}
       </div>
+
+      {/* Start new search button */}
+      {onStartNewSearch && (
+        <div className="border-t border-gray-100 p-3">
+          <button
+            onClick={onStartNewSearch}
+            className="w-full py-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            Start new search
+          </button>
+        </div>
+      )}
     </div>
   )
 }
