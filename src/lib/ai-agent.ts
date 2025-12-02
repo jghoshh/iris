@@ -69,17 +69,27 @@ ${JSON.stringify({
 ## Tool Usage Guidelines
 Use tools to show UI components when the user is actively trying to find a deal.
 
-IMPORTANT - When to call tools:
-- ask_for_budget: ONLY when user clearly states an item they want to search for (e.g., "looking for an iphone", "i need a macbook")
+CRITICAL - When to call ask_for_budget:
+You MUST call ask_for_budget tool whenever the user mentions an item name. This is NOT optional.
+Examples that REQUIRE calling ask_for_budget:
+- "iphone" → call ask_for_budget(item="iphone")
+- "airpods" → call ask_for_budget(item="airpods")
+- "macbook" → call ask_for_budget(item="macbook")
+- "looking for a ps5" → call ask_for_budget(item="ps5")
+
+IMPORTANT: Even if the user just said something off-topic (like "what's your name?") and then says an item name, you MUST still call ask_for_budget. The conversation context doesn't matter - if they say an item name, call the tool.
+
+Never respond to an item name with just text. Always use the tool to show the budget input UI.
+
+Other tool triggers:
 - ask_for_confirmation: When user provides budget amount or says they don't know their budget
 - search_marketplace: When user confirms search (start_search:true action)
 - start_negotiation: When user selects a deal (selected_deal_id action)
 
 DO NOT call tools when:
 - User is asking questions ("what's your name?", "how does this work?", "what can you do?")
-- User is making conversation or small talk
-- User hasn't clearly indicated they want to search for something
-- You're unsure what item they want - just ask them to clarify instead
+- User is making conversation or small talk that doesn't mention an item
+- User says something vague like "yes", "no", "ok" without mentioning an item
 
 ## Response Style
 - Always lowercase (except proper nouns)
@@ -588,10 +598,23 @@ async function callOpenRouter(
   } else if (componentValues.seller_response) {
     forcedToolChoice = { type: 'function', function: { name: 'generate_message_suggestions' } }
     console.log(`[OpenRouter] Forcing generate_message_suggestions after seller response`)
+  } else {
+    // Safety net: Force ask_for_budget when user mentions a demo product and we need budget
+    // This is necessary because some models (like grok) don't reliably call tools from prompts alone
+    const userText = lastMessage?.content?.toLowerCase() || ''
+    const demoProducts = ['iphone', 'macbook', 'ps5', 'airpods', 'monitor', 'desk', 'chair', 'bike', 'couch',
+                          'phone', 'laptop', 'playstation', 'earbuds', 'headphones', 'sofa', 'bicycle']
+    const mentionsDemoProduct = demoProducts.some(p => userText.includes(p))
+    const needsBudget = !currentProfile.budgetMax || currentProfile.budgetMax === null
+    const notInNegotiation = !currentProfile.selectedDealId
+
+    if (mentionsDemoProduct && needsBudget && notInNegotiation) {
+      forcedToolChoice = { type: 'function', function: { name: 'ask_for_budget' } }
+      console.log(`[OpenRouter] Forcing ask_for_budget - user mentioned "${userText}" and no budget set`)
+    }
   }
 
-  // Let the AI decide when to call tools based on the system prompt
-  // We only force tools for specific button-click actions (handled above)
+  // Let the AI decide in other cases based on the system prompt
 
   const requestBody: Record<string, unknown> = {
     model: OPENROUTER_MODEL,
@@ -605,10 +628,8 @@ async function callOpenRouter(
   // NOTE: Reasoning disabled for now - adds 5+ seconds latency due to large encrypted payloads
   if (isReasoningModel) {
     requestBody.reasoning = { enabled: false }
-    requestBody.max_tokens = 500
   } else {
     requestBody.temperature = 0.3
-    requestBody.max_tokens = 150
   }
 
   console.log(`[OpenRouter] Request body:`, JSON.stringify(requestBody, null, 2))
