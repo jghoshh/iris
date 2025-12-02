@@ -1,0 +1,86 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String
+  globalPreferences String    @default("{}") // JSON string for preferences
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  sessions          Session[]
+}
+
+model Session {
+  id              String    @id @default(uuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  goalText        String?
+  budgetMin       Float?
+  budgetMax       Float?
+  hardConstraints String    @default("{}") // JSON string
+  softPreferences String    @default("{}") // JSON string
+  deadlineDate    DateTime?
+  status          String    @default("active") // active, archived
+  winnerDealId    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deals           Deal[]
+}
+
+model Deal {
+  id                 String           @id @default(uuid())
+  sessionId          String
+  session            Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  listingTitle       String
+  marketplaceType    String           @default("other") // facebook_marketplace, craigslist, other
+  listingDescription String?
+  listingUrl         String?
+  askingPrice        Float
+  listingAttributes  String           @default("{}") // JSON string
+  distanceKm         Float?
+  postedDaysAgo      Int?
+  fitScore           Float            @default(0)
+  priceScore         Float            @default(0)
+  riskScore          Float            @default(0)
+  leverageScore      Float            @default(0)
+  dealScore          Float            @default(0)
+  state              String           @default("active") // active, waiting_on_seller, near_agreement, stale, done, dead
+  outcome            String?          // PURCHASED, WALKED_AWAY_TOO_EXPENSIVE, WALKED_AWAY_SKETCHY, ITEM_SOLD_TO_OTHER, CHANGED_MIND, OTHER
+  agentRating        Int?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  negotiationPlan    NegotiationPlan?
+  chatTurns          ChatTurn[]
+}
+
+model NegotiationPlan {
+  id                   String   @id @default(uuid())
+  dealId               String   @unique
+  deal                 Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  targetPrice          Float
+  walkawayPrice        Float
+  maxConcessions       Int      @default(3)
+  currentConcessionStep Int     @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model ChatTurn {
+  id        String   @id @default(uuid())
+  dealId    String
+  deal      Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  role      String   // buyer, seller, agent_suggestion
+  content   String
+  createdAt DateTime @default(now())
+}
