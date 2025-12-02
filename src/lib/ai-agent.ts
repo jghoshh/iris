@@ -612,8 +612,9 @@ async function callOpenRouter(
   }
 
   // Reasoning models need different params
+  // NOTE: Reasoning disabled for now - adds 5+ seconds latency due to large encrypted payloads
   if (isReasoningModel) {
-    requestBody.reasoning = { enabled: true }
+    requestBody.reasoning = { enabled: false }
     requestBody.max_tokens = 500
   } else {
     requestBody.temperature = 0.3
