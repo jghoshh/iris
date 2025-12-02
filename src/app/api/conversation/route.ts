@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ConversationMessage, SearchProfile } from '@/lib/conversation-agent'
 import { getAIResponse, executeSearch } from '@/lib/ai-agent'
-import { getOrCreateDemoUser } from '@/lib/demo-user'
-import { GlobalPreferences, defaultGlobalPreferences } from '@/types'
+import { defaultGlobalPreferences } from '@/types'
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -17,12 +16,8 @@ export async function POST(request: NextRequest) {
     }
     console.log(`[API] Body parsed: +${Date.now() - startTime}ms`)
 
-    // Get user preferences
-    const user = await getOrCreateDemoUser()
-    const globalPreferences: GlobalPreferences = user.globalPreferences
-      ? JSON.parse(user.globalPreferences)
-      : defaultGlobalPreferences
-    console.log(`[API] User prefs loaded: +${Date.now() - startTime}ms`)
+    // Use default preferences for demo
+    const globalPreferences = defaultGlobalPreferences
 
     // If triggerSearch is true, execute the actual search
     if (triggerSearch) {

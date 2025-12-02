@@ -22,7 +22,7 @@ export const defaultGlobalPreferences: GlobalPreferences = {
   avoidOffPlatform: false,
 }
 
-// Hard Constraints for Session
+// Hard Constraints for scoring
 export interface HardConstraints {
   [key: string]: string | number | boolean
 }
@@ -35,24 +35,12 @@ export interface ImportanceWeights {
   urgency: number
 }
 
-// Soft Preferences for Session
+// Soft Preferences
 export interface SoftPreferences {
   preferredBrands?: string[]
   preferredModels?: string[]
   preferredColors?: string[]
   importance: ImportanceWeights
-}
-
-export const defaultSoftPreferences: SoftPreferences = {
-  preferredBrands: [],
-  preferredModels: [],
-  preferredColors: [],
-  importance: {
-    price: 0.5,
-    condition: 0.3,
-    distance: 0.2,
-    urgency: 0.0,
-  },
 }
 
 // Listing Attributes
@@ -67,15 +55,4 @@ export interface DealScores {
   riskScore: number
   leverageScore: number
   dealScore: number
-}
-
-// Session Summary for list view
-export interface SessionSummary {
-  id: string
-  name: string
-  status: string
-  activeDealsCount: number
-  highestDealScore: number | null
-  statusSummary: string
-  createdAt: Date
 }

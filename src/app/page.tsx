@@ -1,19 +1,9 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import Link from 'next/link'
 import { ChatComponents } from '@/components/ChatComponents'
-import { conversation, searches } from '@/lib/api'
+import { conversation } from '@/lib/api'
 import { ConversationMessage, SearchProfile, InteractiveComponent } from '@/lib/conversation-agent'
-
-interface SearchSummary {
-  id: string
-  name: string
-  status: string
-  activeDealsCount: number
-  highestDealScore: number | null
-  statusSummary: string
-}
 
 export default function Home() {
   const [messages, setMessages] = useState<ConversationMessage[]>([])
@@ -21,14 +11,7 @@ export default function Home() {
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [stage, setStage] = useState<string>('greeting')
-  const [existingSearches, setExistingSearches] = useState<SearchSummary[]>([])
-  const [showSearches, setShowSearches] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // Load existing searches
-  useEffect(() => {
-    loadSearches()
-  }, [])
 
   // Start conversation on mount
   useEffect(() => {
@@ -42,15 +25,7 @@ export default function Home() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const loadSearches = async () => {
-    const result = await searches.list()
-    if (result.success && result.data) {
-      setExistingSearches(result.data as unknown as SearchSummary[])
-    }
-  }
-
   const getInitialMessage = () => {
-    // Fixed greeting - no API call needed
     const assistantMessage: ConversationMessage = {
       id: crypto.randomUUID(),
       role: 'assistant',
@@ -92,7 +67,6 @@ export default function Home() {
         content: result.data.message,
         components: result.data.components as InteractiveComponent[] | undefined,
         timestamp: new Date(),
-        // Preserve reasoning_details for multi-turn reasoning model conversations
         reasoning_details: result.data.reasoning_details,
       }
       setMessages([...newMessages, assistantMessage])
@@ -100,12 +74,7 @@ export default function Home() {
       // If stage is "searching", trigger the actual search after a delay for animation
       if (result.data.stage === 'searching') {
         setTimeout(() => triggerDealSearch(updatedProfile, [...newMessages, assistantMessage]), 1500)
-        return // Don't set isLoading to false yet
-      }
-
-      // If search is ready, create it
-      if (result.data.stage === 'ready' && updatedProfile.isComplete) {
-        await createSearch(updatedProfile)
+        return
       }
     }
     setIsLoading(false)
@@ -132,26 +101,6 @@ export default function Home() {
     setIsLoading(false)
   }
 
-  const createSearch = async (profile: SearchProfile) => {
-    const result = await searches.create({
-      name: profile.itemDescription || 'New Search',
-      goalText: `Looking for ${profile.itemDescription}`,
-      budgetMin: profile.budgetMin,
-      budgetMax: profile.budgetMax,
-      softPreferences: {
-        mustHaves: profile.mustHaves,
-        niceToHaves: profile.niceToHaves,
-        dealBreakers: profile.dealBreakers,
-        urgency: profile.urgency,
-        maxDistance: profile.maxDistance,
-      },
-    })
-
-    if (result.success) {
-      loadSearches()
-    }
-  }
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (inputValue.trim() && !isLoading) {
@@ -171,85 +120,15 @@ export default function Home() {
     setMessages([])
     setSearchProfile({ isComplete: false })
     setStage('greeting')
-    setShowSearches(false)
     setTimeout(() => getInitialMessage(), 100)
   }
 
-  // Show searches list view
-  if (showSearches) {
-    return (
-      <div className="min-h-screen bg-white">
-        <header className="relative">
-          <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-center">
-            <span className="text-xl font-bold">iris</span>
-            <nav className="absolute right-4 flex items-center gap-3">
-              <button onClick={startNewSearch} className="text-sm hover:underline">
-                New Search
-              </button>
-            </nav>
-          </div>
-        </header>
-        <main className="max-w-2xl mx-auto px-4 py-8">
-          <h1 className="text-2xl font-bold mb-6">Your Searches</h1>
-          <div className="space-y-3">
-            {existingSearches.map((search) => (
-              <Link
-                key={search.id}
-                href={`/searches/${search.id}`}
-                className="block border border-black p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-bold">{search.name}</h3>
-                    <p className="text-sm text-gray-600">{search.statusSummary || 'No deals yet'}</p>
-                  </div>
-                  <div className="text-right">
-                    {search.highestDealScore !== null && (
-                      <span
-                        className={`score-badge ${
-                          search.highestDealScore >= 70
-                            ? 'score-high'
-                            : search.highestDealScore >= 50
-                            ? 'score-medium'
-                            : 'score-low'
-                        }`}
-                      >
-                        Best: {search.highestDealScore}
-                      </span>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      {search.activeDealsCount || 0} deal{search.activeDealsCount !== 1 ? 's' : ''}
-                    </p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-            {existingSearches.length === 0 && (
-              <p className="text-gray-500 text-center py-8">No searches yet</p>
-            )}
-          </div>
-        </main>
-      </div>
-    )
-  }
-
-  // Main chat interface - full page
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Minimal header */}
       <header className="relative">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-center">
           <span className="text-xl font-bold">iris</span>
-          {existingSearches.length > 0 && (
-            <nav className="absolute right-4 sm:right-6 lg:right-8 flex items-center gap-3">
-              <button
-                onClick={() => setShowSearches(true)}
-                className="text-sm hover:underline"
-              >
-                Searches ({existingSearches.length})
-              </button>
-            </nav>
-          )}
         </div>
       </header>
 
@@ -308,14 +187,8 @@ export default function Home() {
         <div className="pb-8 sm:pb-12">
           {stage === 'ready' && searchProfile.isComplete ? (
             <div className="flex flex-col sm:flex-row gap-2">
-              <button onClick={startNewSearch} className="btn flex-1 rounded-full py-3 sm:py-2">
-                Start Another Search
-              </button>
-              <button
-                onClick={() => setShowSearches(true)}
-                className="btn btn-primary flex-1 rounded-full py-3 sm:py-2"
-              >
-                View Searches
+              <button onClick={startNewSearch} className="btn btn-primary flex-1 rounded-full py-3 sm:py-2">
+                Start New Search
               </button>
             </div>
           ) : (

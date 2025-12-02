@@ -42,30 +42,3 @@ export const conversation = {
       body: JSON.stringify({ messages, searchProfile, triggerSearch: options?.triggerSearch }),
     }),
 }
-
-// Searches
-export const searches = {
-  list: () => fetchApi<Array<Record<string, unknown>>>('/sessions'),
-
-  get: (id: string) => fetchApi<Record<string, unknown>>(`/sessions/${id}`),
-
-  create: (data: {
-    name: string
-    goalText?: string
-    budgetMin?: number
-    budgetMax?: number
-    hardConstraints?: Record<string, unknown>
-    softPreferences?: Record<string, unknown>
-    deadlineDate?: string
-  }) =>
-    fetchApi<Record<string, unknown>>('/sessions', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
-  update: (id: string, data: Record<string, unknown>) =>
-    fetchApi<Record<string, unknown>>(`/sessions/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
-}
