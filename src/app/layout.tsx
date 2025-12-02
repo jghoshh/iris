@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Iris - Marketplace Negotiation Agent",
+  title: "iris",
   description: "Help buyers manage and negotiate multiple deals across marketplaces",
 };
 
